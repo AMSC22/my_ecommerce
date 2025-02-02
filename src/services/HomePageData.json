@@ -1,0 +1,18 @@
+{
+    "banner": {
+      "title": "Bienvenue sur notre boutique",
+      "subtitle": "Découvrez nos promotions exclusives",
+      "image": "https://example.com/banner.jpg",
+      "cta": {
+        "label": "Achetez maintenant",
+        "link": "/shop"
+      }
+    },
+    "featuredProducts": [
+      { "id": 1, "title": "Produit 1", "price": 20, "image": "https://example.com/product1.jpg" },
+      { "id": 2, "title": "Produit 2", "price": 30, "image": "https://example.com/product2.jpg" }
+    ],
+    "testimonials": [
+      { "id": 1, "name": "Client 1", "comment": "Service incroyable !" }
+    ]
+  }
