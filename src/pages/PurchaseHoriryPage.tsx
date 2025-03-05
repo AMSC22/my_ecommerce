@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from "react";
-import Button from "../components/Button.tsx";
+import { useLocation } from "react-router-dom";
+import Loader from "../components/Loader.tsx";
+import { OderData } from "../entities/Orders.tsx";
+import { fetchOrders } from "../services/OrderService.ts";
 
 interface Purchase {
   id: number;
   date: string;
-  items: {
-    name: string;
-    quantity: number;
-    price: number;
-    image: string;
-  }[];
+  name: string;
+  quantity: number;
+  price: number;
+  currency: string;
+  image: string;
   total: number;
   status: string;
 }
@@ -17,61 +19,73 @@ interface Purchase {
 const PurchaseHistoryPage: React.FC = () => {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [message, setMessage] = useState<string | null>(null);
+  const location = useLocation();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const datas = [
-    {
-      "id": 1,
-      "date": "2025-01-10",
-      "seller": "TechShop Inc.",
-      "items": [
-        {
-          "name": "Casque Bluetooth",
-          "quantity": 1,
-          "price": 49.99,
-          "image": "https://example.com/headphone.jpg"
-        }
-      ],
-      "total": 49.99,
-      "status": "Livré"
-    },
-    {
-      "id": 2,
-      "date": "2025-01-08",
-      "seller": "FashionWorld",
-      "items": [
-        {
-          "name": "T-shirt en coton",
-          "quantity": 2,
-          "price": 15.99,
-          "image": "https://example.com/tshirt.jpg"
-        },
-        {
-          "name": "Jeans slim",
-          "quantity": 1,
-          "price": 39.99,
-          "image": "https://example.com/jeans.jpg"
-        }
-      ],
-      "total": 71.97,
-      "status": "En attente"
-    }
-  ]
-  
+  const imageLink = "/images/";
+  const user_id = localStorage.getItem("user_id") || ""; // Récupération de l'utilisateur connecté  
   // Fetch historique des achats
   useEffect(() => {
+    if (!user_id) {
+      setError("Utilisateur non connecté !");
+      setLoading(false);
+      return;
+    }
     const fetchPurchases = async () => {
       try {
-        // const response = await fetch("/api/purchases");
-        const data = datas; // await response.json();
-        setPurchases(data);
+        if (location.state) {
+          const datas = [
+            {
+              "id": location.state.orderId.id,
+              "date": location.state.orderId.date.split("T")[0],
+              "seller": location.state.orderId.seller_name,
+              "name": location.state.orderId.productName,
+              "quantity": location.state.orderId.quantity,
+              "price": location.state.orderId.price,
+              "currency": location.state.orderId.currency,
+              "image": location.state.orderId.image,
+              "total": location.state.orderId.price * location.state.orderId.quantity,
+              "status": location.state.orderId.status
+            },
+          ]
+          setPurchases(datas);
+        } else {
+          setLoading(true);
+          setError(null);
+          const totalSale: OderData[] = await fetchOrders(["buyer", user_id], "");
+          
+          const datas = totalSale.map((value) => 
+            ({
+              id: value.id,
+              date: value.date.split("T")[0],
+              seller: value.seller_name,
+              name: value.productName,
+              quantity: value.quantity,
+              price: value.price,
+              currency: value.currency,
+              image: value.image,
+              total: value.price * value.quantity,
+              status: value.status
+            }),
+          )
+  
+          setPurchases(datas);
+          setLoading(false);
+          setError(null);
+        }
       } catch (error) {
-        console.error("Erreur lors du chargement de l'historique :", error);
         setMessage("Erreur de chargement. Veuillez réessayer plus tard.");
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchPurchases();
-  }, []);
+  }, [user_id]);
+
+  if (loading) return <Loader />;
+  if (error) return <p className="text-center text-red-500">{error}</p>;
 
   return (
     <div className="p-6">
@@ -87,24 +101,22 @@ const PurchaseHistoryPage: React.FC = () => {
                 <p className="text-gray-500">{purchase.date}</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                {purchase.items.map((item, index) => (
-                  <div key={index} className="flex items-center gap-4">
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="w-16 h-16 object-cover rounded-md"
-                    />
-                    <div>
-                      <h3 className="font-bold">{item.name}</h3>
-                      <p>
-                        Quantité : {item.quantity} | Prix : {item.price} €
-                      </p>
-                    </div>
+                <div className="flex items-center gap-4">
+                  <img
+                    src={imageLink + purchase.image}
+                    alt={purchase.name}
+                    className="w-16 h-16 object-cover rounded-md"
+                  />
+                  <div>
+                    <h3 className="font-bold">{purchase.name}</h3>
+                    <p>
+                      Quantité : {purchase.quantity} | Prix : {purchase.price} {purchase.currency}
+                    </p>
                   </div>
-                ))}
+                </div>
               </div>
               <div className="flex justify-between items-center">
-                <p className="font-semibold text-lg">Total : {purchase.total} €</p>
+                <p className="font-semibold text-lg">Total : {purchase.total} {purchase.currency}</p>
                 <p
                   className={`${
                     purchase.status === "Livré"

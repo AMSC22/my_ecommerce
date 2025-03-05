@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Loader from "../../components/Loader.tsx";
 import Button from "../../components/Button.tsx";
 import Tooltip from "../../components/TooltipProps.tsx";
 import CommandProcess from "../../components/CommandProcess.tsx";
 import { fetchCarts, updateCart, removeCartItem } from "../../services/CartService.ts";
 import { Carts } from "../../entities/Carts.tsx";
-import NoElementComponent from "../../components/NoElementComponent.tsx";
 import ErrorComponent from "../../components/ErrorComponent.tsx";
 
 const CartPage: React.FC = () => {
@@ -18,63 +17,72 @@ const CartPage: React.FC = () => {
   const [cart, setCart] = useState<Carts[]>([]);
   const [currency, setCurrency] = useState<string>();
 
-  const user_id = "6796bc4f387b9c8670791537"
-  // Chargement des données du Panier
+  // 🔹 Vérification que `user_id` est bien récupéré
+  const user_id = localStorage.getItem("user_id") || "";
+  if (!user_id) {
+    console.warn("⚠️ Avertissement: Aucun `user_id` trouvé dans localStorage.");
+  }
+
+  console.log("user_id = ", user_id);
+  // 🛒 Chargement des données du Panier
   useEffect(() => {
     const loadCarts = async () => {
       try {
         setLoading(true);
         setError(null);
+
+        // 🔹 Vérification que `fetchCarts` retourne bien des données
         const allCarts: Carts[] = await fetchCarts(user_id);
+        console.log("Carts = ", allCarts);
+        if (!allCarts || allCarts.length === 0) {
+          setCart([]);
+          setLoading(false);
+          // return;
+          // throw new Error("Votre panier est vide.");
+        }
+
         setCart(allCarts);
-        setCurrency(allCarts[0].currency);
-        setLoading(false);
-        setError(null);          
+        setCurrency(allCarts[0]?.currency || "XAF"); // Assure une valeur par défaut
       } catch (error: any) {
-        setError(error.message || "Une erreur est survenue.");
+        setError(error.response?.data?.detail || error.message || "Une erreur est survenue.");
         // toast.error(error.message || "Une erreur est survenue.");
       } finally {
         setLoading(false);
       }
     };
     loadCarts();
-  }, []);
+  }, [user_id]);
 
-  // Fonction pour la mise à jour de la quantité dans l'état local
+  // 🏷️ Fonction pour la mise à jour de la quantité dans l'état local
   const handleQuantityChange = (product_id: string, newQuantity: number) => {
     if (!cart) return;
     const updatedItem = cart.map((item) => item.product_id === product_id ? { ...item, quantity: newQuantity } : item);
     setCart(updatedItem);
   };
 
-  // Fonction pour supprimer un article dans le panier
+  // 🗑️ Suppression d'un article du panier
   const handleRemoveItem = async (product_id: string) => {
     if (!cart) return;
-    const updatedCart = await removeCartItem(user_id, product_id);
-    if (updatedCart) {
-      let newCart: Carts[] = [];
-      for (let index = 0; index < cart.length; index++) {
-        if (product_id != cart[index].product_id) {
-          // delete cart[index];
-          newCart[index] = cart[index];
-          break
-        }
-      }
-      setCart(newCart);
-    } else {
+    try {
+      await removeCartItem(user_id, product_id);
+      setCart(cart.filter(item => item.product_id !== product_id));
+    } catch (error) {
+      console.error("Erreur suppression panier:", error);
       setError("Erreur lors de la suppression du produit.");
     }
   };
 
-  // Fonction pour passer à la page livraison
+  // 🚚 Passer à la page Livraison
   const handleDelivery = async () => {
-    setCurrentStep((prev) => Math.min(prev + 1, 4)); // Met à jour le processus de commande
+    setCurrentStep((prev) => Math.min(prev + 1, 4));
     if (!cart) return;
-    const updatedCart = await updateCart(user_id, cart);
-    if (updatedCart) {
-      navigate("/delivery", { state: { cartItems: cart } }); // Transmet les produits
-    } else {
-      setError("Echec de la mise à jour du panier.");
+
+    try {
+      await updateCart(user_id, cart);
+      navigate("/delivery", { state: { cartItems: cart } });
+    } catch (error) {
+      console.error("Erreur mise à jour panier:", error);
+      setError("Échec de la mise à jour du panier.");
     }
   };
 
@@ -83,19 +91,13 @@ const CartPage: React.FC = () => {
     navigate("/categories");
   };
 
-  // Calcul des totaux
-  let subTotal: number;
-  if (cart.length === 0) {
-    subTotal = 0;
-  } else {
-  subTotal = cart.reduce(
-    (total: number, item: any) => total + item.price_per_unit * item.quantity,
-    0
-  );};
-  const taxes = subTotal * 0.2; // Exemple : 20% de taxes
-  const deliveryFee = subTotal > 100 ? 0 : 5; // Livraison gratuite pour les commandes > 100€
+  // 💰 Calcul des totaux
+  const subTotal = cart.reduce((total, item) => total + (item.price_per_unit * item.quantity), 0);
+  const taxes = subTotal * 0.2;
+  const deliveryFee = subTotal > 100 ? 0 : 5;
   const total = subTotal + taxes + deliveryFee;
-  
+
+  // 🔄 Affichage du Loader si en cours de chargement
   if (loading) return <Loader />;
 
   return (
@@ -106,13 +108,26 @@ const CartPage: React.FC = () => {
         <CommandProcess step={currentStep} />
       </header>
 
-      {/* Articles du panier */}
+      {/* 🔴 Gestion des erreurs */}
       {error ? (
-        <ErrorComponent message={error} onRetry={() => navigate("/cart")} />
+        <ErrorComponent message={error} onRetry={() => window.location.reload()} />
       ) : (
+        /* Articles du panier */
       <section className="mb-6">
         {cart.length === 0 ? (
-          <NoElementComponent message="Vous n'avez aucun produit dans votre Panier." />
+        <div className="text-center">
+          
+          <p className="text-lg text-gray-600 mb-6">
+            Votre panier est vide.
+          </p>
+          <Link
+            to="/categories"
+            className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition duration-300"
+          >
+            Parcourir les produits
+          </Link>
+      
+        </div>
         ) : (
         cart.map((item: any) => (
           <div

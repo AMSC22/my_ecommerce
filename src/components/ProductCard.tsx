@@ -7,6 +7,7 @@ interface Product {
   name: string;
   price: number;
   image: string;
+  currency: string;
   rating?: number; // Note moyenne du produit (facultatif)
 }
 
@@ -23,12 +24,13 @@ const ProductCard: React.FC<ProductCardProps> = ({
   onAddToWishlist,
   onViewDetails,
 }) => {
+  const imageLink = "/images/";
   return (
     <div className="border rounded-md shadow-md bg-white p-4">
       {/* Image du produit */}
       <div className="flex justify-center mb-4">
         <img
-          src={product.image}
+          src={imageLink + product.image}
           alt={product.name}
           className="w-32 h-32 object-cover rounded-md"
         />
@@ -37,7 +39,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
       {/* Informations du produit */}
       <h3 className="text-lg font-bold mb-2 text-center">{product.name}</h3>
       <p className="text-blue-600 text-center font-semibold mb-2">
-        {product.price.toFixed(2)} €
+        {product.price.toFixed(2)} {product.currency}
       </p>
       {product.rating && (
         <div className="flex justify-center items-center text-yellow-500 mb-4">

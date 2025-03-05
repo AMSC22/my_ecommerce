@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { useCart } from "../contexts/CartContext.tsx";
-import { Link, useLocation } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import Tooltip from "./TooltipProps.tsx";
-import default_profil from "../assets/Images/default_profil.jpg";
 import { countCart } from "../services/CartService.ts";
 import { countWishlist } from "../services/WishlistService.ts";
+import { Notifications } from "../entities/Notification.tsx";
+import { fetchUnReadNotifications } from "../services/NotificationService.ts";
+// import default_profil from "../assets/Images/default_profil.jpg";
 
 interface NavbarProps {
   isLoggedIn: boolean;
@@ -18,8 +18,7 @@ interface NavbarProps {
 
 const Navbar: React.FC<NavbarProps> = ({
   isLoggedIn,
-  userProfilePicture = default_profil,
-  status,
+  userProfilePicture = "default_profil.jpg",
   onLogout,
   messages = [],
   notifications = [],
@@ -34,33 +33,84 @@ const Navbar: React.FC<NavbarProps> = ({
   const [wishlistCount, setwishlistCount] = useState<number>(0);
   const [cartCount, setcartCount] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
+  const [unreadNotifications, setNnreadNotifications] = useState<Notifications[]>([]);
+  // const [error, setError] = useState<string | null>(null);
 
-  const user_id = "6796bc4f387b9c8670791537"
+  const user_id = localStorage.getItem("user_id") || "";
+
   // Chargement des données de la liste des Souhaits
-  useEffect(() => {
-    const loadWishlists = async () => {
-      try {
-        setError(null);
-        const allwishlists = await countWishlist([user_id]);
-        setwishlistCount(allwishlists[0].total_products);
-        const allcartCounts = await countCart([user_id]);
-        setcartCount(allcartCounts[0].total_products);
-        setError(null);
-      } catch (error) {
-        setError(error);
-      }          
-    };
-    loadWishlists();
-  }, []);
+  const loadCartCounts = async () => {
+    try {
+      setError(null);
+      const allcartCounts = await countCart([user_id]);
+      setcartCount(allcartCounts[0].total_products);
+      setError(null);
+    } catch (error) {
+      setError("Une erreur est survenue");
+    }          
+  };
 
+  // Chargement des données de la liste des Souhaits
+  const loadWishlistCounts = async () => {
+    try {
+      setError(null);
+      const allwishlists = await countWishlist([user_id]);
+      setwishlistCount(allwishlists[0].total_products);
+      setError(null);
+    } catch (error) {
+      setError("Une erreur est survenue");
+    }          
+  };
+
+  useEffect(() => {
+    loadCartCounts();
+    loadWishlistCounts();
+  
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === "cart-update" || event.key === "wishlist-update") {
+        loadCartCounts();
+        loadWishlistCounts();
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, [user_id]);
+  
   messages = [{ id: 1, text: "string", time: "string", isRead: false },
     { id: 2, text: "stringstringstringstringstringstringstringstringstringstringstring", time: "string", isRead: true },
     { id: 3, text: "string", time: "string", isRead: false },
     { id: 4, text: "string", time: "string", isRead: true }
   ]
+
+  useEffect(() => {
+    if (!user_id) {
+      setError("Utilisateur non connecté !");
+      return;
+    }
+
+    const loadNotifications = async () => {
+      const notifications: Notifications[] = await fetchUnReadNotifications();
+      setNnreadNotifications(notifications);
+      console.log("Notification = ", notifications);
+    };
+    loadNotifications();
+
+  }, [user_id]);
+  
   // Animation de clignotement pour les nouvelles notifications/messages
   const unreadMessages = messages.filter((msg) => !msg.isRead).length;
-  const unreadNotifications = notifications.filter((notif) => !notif.isRead).length;
+  // const unreadNotifications = notifications.filter((notif) => !notif.isRead).length;
+
+  const markMessagesAsRead = () => {
+    messages.forEach(msg => (msg.isRead = true));
+    navigate("/message");
+  };
+
+  const markNotificationsAsRead = () => {
+    notifications.forEach(notif => (notif.isRead = true));
+    navigate("/notifications");
+  };
 
   const handleSearch = () => {
     if (searchQuery.trim()) {
@@ -173,7 +223,7 @@ const Navbar: React.FC<NavbarProps> = ({
             <Tooltip message="Votre panier d'achat" position="bottom">
               🛒
             </Tooltip>
-            {cartCount > 0 && error != null && (
+            {cartCount > 0 && error === null && (
               <span className="absolute -top-2 -right-3 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
                 {cartCount}
               </span>
@@ -183,7 +233,7 @@ const Navbar: React.FC<NavbarProps> = ({
           {/* Liste de souhaits */}
           <Link to="/wishlist" className="relative hover:text-yellow-400">
             <Tooltip message="Votre liste de souhaits" position="bottom">❤️</Tooltip>
-            {wishlistCount  > 0 && error != null && (
+            {wishlistCount  > 0 && error === null && (
               <span className="absolute -top-2 -right-3 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
                 {wishlistCount}
               </span>
@@ -231,14 +281,14 @@ const Navbar: React.FC<NavbarProps> = ({
             <div className="relative dropdown">
               <div
                 className={`relative cursor-pointer hover:text-yellow-400 ${
-                  unreadNotifications > 0 ? "animate-pulse" : ""
+                  unreadNotifications.length > 0 ? "animate-pulse" : ""
                 }`}
                 onClick={() => handleDropdown("notification")}
               >
                 <Tooltip message="Vos notifications" position="bottom">🔔</Tooltip>
-                {unreadNotifications > 0 && (
+                {unreadNotifications.length > 0 && (
                   <span className="absolute -top-2 -right-3 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                    {unreadNotifications}
+                    {unreadNotifications.length}
                   </span>
                 )}
               </div>

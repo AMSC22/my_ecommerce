@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
+import { Link, useParams, useLocation } from "react-router-dom";
 import Button from "../components/Button.tsx";
 import Tooltip from "../components/TooltipProps.tsx";
 import Card from "../components/Card.tsx";
@@ -8,12 +8,15 @@ import { Product } from "../entities/Product.tsx";
 import { fetchReviews, addReviews } from "../services/ReviewService.ts";
 import { Review } from "../entities/Reviews.tsx";
 import ErrorComponent from "../components/ErrorComponent.tsx";
-import { fetchProductById, addToWishLists, addToCarts } from "../services/ProductService.ts";
+import { fetchvalidatedProducts, fetchProductById, addToWishLists, addToCarts } from "../services/ProductService.ts";
 import { fetchCategoryById } from "../services/CategoryService.ts";
 import { Category } from "../entities/Categories.tsx";
+import { fetchOrders } from "../services/OrderService.ts";
+import { OderData } from "../entities/Orders.tsx";
+import { fetchUser } from "../services/UserService.ts";
+import { fetchCarts } from "../services/CartService.ts";
 
 const ProductDetailsPage: React.FC = () => {
-  const navigate = useNavigate();
   const { productId } = useParams<{ productId: string }>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -22,11 +25,16 @@ const ProductDetailsPage: React.FC = () => {
   const [productItems, setProductItems] = useState<Product[]>([]); // Les produits envoyés par la page Produit
   const [reviews, setReviews] = useState<Review[]>([]);
   const [selectedRating, setSelectedRating] = useState(0);
-  const [newReview, setNewReview] = useState<Review>({ user_name: "", rating: 0, comment: "", id: "", product_id: "", product_name: "", created_at: ""});
+  const [newReview, setNewReview] = useState<Review>({ statut: false, user_id: "", rating: 0, comment: "", id: "", product_id: "", product_name: "", created_at: ""});
   const [currentPage, setCurrentPage] = useState(1);
   const [category, setCategory] = useState<Category>({name: "", id: "", created_by: "", description: "", icon_url: "", is_active: true, is_pending: false});
+  const [uniqueCat, setUniqueCat] = useState<string[]>([]);
+  const [recommendedProducts, setRecommendedProducts] = useState<any[]>([]);
+  const [user, setUser] = useState<any>();
+  const [userReviews, setUserReviews] = useState<any[]>([]);
+  const user_id = localStorage.getItem("user_id") || "";
 
-  const user_id = "6796bc4f387b9c8670791537";
+  const imageLink = "/images/";
   // Récupérer les données transmises par la page panier
   let loadProducts: any;
   useEffect(() => {
@@ -44,9 +52,29 @@ const ProductDetailsPage: React.FC = () => {
         setCategory(category);
 
         // Pour collecter les avis sur le produit
-        const allProductReview = await fetchReviews(productId || "");
+        const allProductReview = await fetchReviews(productId || "", true);
         setReviews(allProductReview);
         
+        // Pour collecter le nom du vendeur du produit
+        const user = await fetchUser([allProduct[0].seller_id]);
+        setUser(user[0]);
+
+        // Extraire les user_id
+        const userIds = allProductReview.flatMap(review => review.user_id);
+
+        // Supprimer les doublons avec Set
+        const uniqueUserIds: any[] = [...new Set(userIds)];
+        
+        const userReview = await fetchUser(uniqueUserIds);
+        
+        // Fusionner toutes les listes de products
+        setUserReviews(userReview.flat());
+
+        // Pour collecter le nom des clients ayant donné leur avis sur produit
+        const users = await fetchUser([allProduct[0].seller_id]);
+        console.log("user = ", user[0]);
+        setUser(user[0]);
+
         setLoading(false);
         setError(null);  
       } catch (error: any) {
@@ -55,121 +83,126 @@ const ProductDetailsPage: React.FC = () => {
         setLoading(false);
       }
     };
-    loadProducts();
-  }, [location]);
+    if(productId) loadProducts();
+  }, [productId]);
 
-  // Données statiques pour tester les produits recommandés
-  const products = [
-    { id: 1, name: "Smartphone XYZ", currency: "F CFA", description: "Un smartphone puissant avec des fonctionnalités modernes.", price: 699.99, rating: 4.5, stock: 20, images: ["https://via.placeholder.com/300"], category: "Électronique", brand: "XYZ", seller: "John", },
-    {
-      id: 2,
-      name: "Casque Bluetooth ABC",
-      description: "Un casque Bluetooth avec une qualité sonore exceptionnelle.",
-      price: 59.99,
-      rating: 4.8,
-      stock: 50,
-      currency: "Euro",
-      images: ["https://via.placeholder.com/300"],
-      category: "Électronique",
-      brand: "ABC",
-      seller: "John",
-    },
-    {
-      id: 3,
-      name: "Tablette DEF",
-      description: "Une tablette performante pour le travail et les loisirs.",
-      price: 399.99,
-      rating: 4.2,
-      currency: "USD",
-      stock: 15,
-      images: ["https://via.placeholder.com/300"],
-      category: "Électronique",
-      brand: "DEF",
-      seller: "John",
-    },
-  ];
+  useEffect(() => {
+    if (!user_id) {
+      setError("Utilisateur non connecté !");
+      setLoading(false);
+      return;
+    }
 
-  
-  const reviewsPerPage = 2;
+    const loadSales = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const totalSale: OderData[] = await fetchOrders(["buyer", user_id], "");
+        // Extraire les category_id
+        const categoryIds = totalSale.flatMap(product => product.category_ids);
 
-  let product = products.find((item) => Number(item.id) === Number(productId));
-  if (!product){product = {
-    id: 0,
-    name: "",
-    description: "",
-    price: 0,
-    rating: 0,
-    stock: 0,
-    images: [],
-    category: "",
-    brand: "",
-    currency: "",
-    seller: "",
-  }}
+        // Supprimer les doublons avec Set
+        const uniqueCategoryIds: any[] = [...new Set(categoryIds)];
+        setUniqueCat(uniqueCategoryIds);
+        
+        setLoading(false);
+        setError(null);          
+      } catch (error: any) {
+        setError(error.message || "Une erreur est survenue.");
+        // toast.error(error.message || "Une erreur est survenue.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadSales();
 
-  const filteredReviews = selectedRating
-    ? reviews.filter((review) => review.rating === selectedRating)
-    : reviews;
+  }, [user_id]);
 
-  const paginatedReviews = filteredReviews.slice(
-    (currentPage - 1) * reviewsPerPage,
-    currentPage * reviewsPerPage
-  );
+  useEffect(() => {
+    const loadRecommandedProducts = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        // Collecte les produits du panier de l'acheteur
+        const cartId = await fetchCarts(user_id);
+        const productIds = cartId.flatMap(product => product.product_id);
+        const UniqueCat = [...uniqueCat, ...productIds];
+        const productPromises = UniqueCat.map((categoryId) => fetchvalidatedProducts(categoryId));
+        const recommandedProductArray = await Promise.all(productPromises);
+        // Fusionner toutes les listes de products
+        setRecommendedProducts(recommandedProductArray.flat());
+        setLoading(false);
+        setError(null);          
+      } catch (error: any) {
+        setError(error.message || "Une erreur est survenue.");
+        // toast.error(error.message || "Une erreur est survenue.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (uniqueCat.length > 0) loadRecommandedProducts();
 
-  const handleAddReview = () => {
+  }, [uniqueCat]);
+
+  const handleAddReview = async () => {
     if (newReview) {
-    if (newReview.user_name && newReview.rating && newReview.comment) {
+    if (!newReview.user_id && !newReview.rating && !newReview.comment) {
+      setError("Veuillez remplir tous les champs pour ajouter un avis");
+      return;
+    }
       
-      loadProducts = async () => {
-        try {
-          setError(null);
-          setLoading(true);
-          newReview['product_id'] = productId || "";
-          newReview['product_name'] = productItems[0]?.name || "";
-          const allProductReview = await addReviews([newReview]);
-          setReviews([
-            ...reviews, allProductReview[0]
-          ]);
-          setNewReview({ user_name: "", rating: 0, comment: "", id: "", product_id: "", product_name: "", created_at: ""});
-          setLoading(false);
-          setError(null);        
-        } catch (error: any) {
-          setError(error.message || "Une erreur est survenue.");
-        } finally {
-          setLoading(false);
-        }
-  
-      };
-      loadProducts();
-
-    } else {
-      setError("Veuillez remplir tous les champs pour ajouter un avis.");
-    }};
+    try {
+      setError(null);
+      setLoading(true);
+      newReview['user_id'] = user_id || "";
+      newReview['product_id'] = productId || "";
+      newReview['product_name'] = productItems[0]?.name || "";
+      const allProductReview = await addReviews([newReview]);
+      setReviews([
+        ...reviews, allProductReview[0]
+      ]);
+      setNewReview({ statut: false, user_id: "", rating: 0, comment: "", id: "", product_id: "", product_name: "", created_at: ""});
+      setLoading(false);
+      setError(null);        
+    } catch (error: any) {
+      setError(error.message || "Une erreur est survenue.");
+    } finally {
+      setLoading(false);
+    }
+    };
   };
 
   // Pour ajouter un produit au panier
   const addToCart = (productItems) => {
-    const cart = addToCarts(productItems, user_id);   // A modifier
-    if (cart["user_id"] === "") {
-      setMessage("Vous avez déjà ajouté ce produit à votre panier");
-    };
-    console.log("Cart = ", cart);
+    try {
+      const cart = addToCarts(productItems, user_id);   // A modifier
+      localStorage.setItem("cart-update", Date.now().toString());  // Mets à jour le cache
+      if (cart && cart["user_id"] === "") {
+        setMessage("Vous avez déjà ajouté ce produit à votre panier");
+      };
+    } catch (error) {
+      setError("Erreur lors de l'ajout au panier.");
+    }
   };
 
   // Pour ajouter un produit dans sa liste des souhaits
   const addToWishlist = (productItems) => {
-    const WishList = addToWishLists(productItems, user_id);   // A modifier
-    if (WishList["user_id"] === "") {
-      setMessage("Vous avez déjà ajouté ce produit à votre liste de souhaits.");
-    };
-    console.log("WishList = ", WishList);
+    try {
+      const cart = addToWishLists(productItems, user_id);   // A modifier
+      localStorage.setItem("wishlist-update", Date.now().toString());  // Mets à jour le cache
+      if (cart && cart["user_id"] === "") {
+        setMessage("Vous avez déjà ajouté ce produit à votre liste de souhaits.");
+      };
+    } catch (error) {
+      setError("Erreur lors de l'ajout à la liste de souhaits.");
+    }
   };
 
   // Pour télécharger les avis dans un fichier CSV
   const exportReviews = () => {
     const csvContent = [
       ["Utilisateur", "Note", "Commentaire"],
-      ...reviews.map((review) => [review.user_name, review.rating, review.comment]),
+      ...reviews.map((review) => [review.user_id, review.rating, review.comment]),
     ]
       .map((row) => row.join(","))
       .join("\n");
@@ -191,6 +224,26 @@ const ProductDetailsPage: React.FC = () => {
       <ErrorComponent message={error} onRetry={() => location}/>
     );
   }
+  
+  const reviewsPerPage = 2;
+
+  const filteredReviews = selectedRating
+    ? reviews.filter((review) => review.rating === selectedRating)
+    : reviews;
+
+  const paginatedReviews = filteredReviews.slice(
+    (currentPage - 1) * reviewsPerPage,
+    currentPage * reviewsPerPage
+  );
+
+  const totalPages = Math.ceil(filteredReviews.length / reviewsPerPage);
+  const nextPage = () => {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+  }
+
+  const prevPage = () => {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  }
 
   if (!productItems) {
     return (
@@ -208,9 +261,9 @@ const ProductDetailsPage: React.FC = () => {
         {/* Image du produit */}
         <div>
           <img
-            src={productItems[0].images[0]}
+            src={imageLink + productItems[0].images[0]}
             alt={productItems[0].name}
-            className="w-full h-auto rounded-md shadow-lg"
+            className="w-full h-80 rounded-md shadow-lg"
           />
         </div>
 
@@ -228,7 +281,7 @@ const ProductDetailsPage: React.FC = () => {
             Marque : <span className="font-semibold">{productItems[0].brand}</span>
           </p>
           <p className="text-sm text-gray-500 mb-4">
-            Vendeur : <span className="font-semibold"><Link to={`/other-profile/${productItems[0].seller_id}`}>{productItems[0].seller_id}</Link></span>
+            Vendeur : <span className="font-semibold"><Link to={`/other-profile/${productItems[0].seller_id}`}>{user?.first_name + " " + user?.last_name}</Link></span>
           </p>
 
           {/* Stock et Évaluation */}
@@ -259,6 +312,7 @@ const ProductDetailsPage: React.FC = () => {
               label="Ajouter au panier"
               type="primary"
               onClick={() => addToCart(productItems)}
+              disabled={productItems[0].quantity <= 0}
             />
             <Button
               label="Ajouter à la liste de souhaits"
@@ -266,6 +320,19 @@ const ProductDetailsPage: React.FC = () => {
               onClick={() => addToWishlist(productItems)}
             />
           </div>
+        </div>
+      </div>
+
+      {/* Section des photos du produit avec défilement horizontal */}
+      <div className="overflow-auto whitespace-nowrap py-4">
+        <div className="flex gap-4">
+          {productItems[0].images.map((image, index) => (
+            <img 
+            key={index} 
+            src={imageLink + image} 
+            alt={`Photo ${index + 1} du produit`}
+            className="h-48 rounded-md" />
+          ))}
         </div>
       </div>
 
@@ -277,49 +344,51 @@ const ProductDetailsPage: React.FC = () => {
       ) : (
       <div className="mt-8">
         <h2 className="text-2xl font-bold mb-4">Avis des utilisateurs</h2>
-        <div className="flex gap-4 mb-4">
-          <Button
-            label="Tous les avis"
-            onClick={() => setSelectedRating(0)}
-            type={selectedRating === 0 ? "primary" : "secondary"}
-          />
-          {[5, 4, 3, 2, 1].map((rating) => (
+        <div className="overflow-auto">
+          <div className="flex gap-4 mb-4">
             <Button
-              key={rating}
-              label={`${rating} étoiles`}
-              onClick={() => setSelectedRating(rating)}
-              type={selectedRating === rating ? "primary" : "secondary"}
+              label="Tous les avis"
+              onClick={() => setSelectedRating(0)}
+              type={selectedRating === 0 ? "primary" : "secondary"}
             />
-          ))}
+            {[5, 4, 3, 2, 1].map((rating) => (
+              <Button
+                key={rating}
+                label={`${rating} étoiles`}
+                onClick={() => setSelectedRating(rating)}
+                type={selectedRating === rating ? "primary" : "secondary"}
+              />
+            ))}
+          </div>
+          {paginatedReviews.length !== 0 ? (paginatedReviews.map((review, index) => (
+            <div key={review.id} className="border-b pb-4 mb-4">
+              <p className="text-yellow-500">★ {review.rating}</p>
+              <p>
+                <strong>{userReviews[index]?.first_name + " " + userReviews[index]?.last_name} :</strong> {review.comment}
+              </p>
+            </div>
+          ))):(      <div className="text-center mt-20 py-40">
+            <h1 className="text-2xl font-bold">Aucun avis trouvé</h1>
+            <p>Nous n'avons aucun avis pour ce produit.</p>
+          </div>)}
+          {filteredReviews.length > reviewsPerPage && (
+            <div className="flex justify-between items-center mt-4">
+              <Button
+                label="Précédent"
+                onClick={prevPage}
+                type="secondary"
+                disabled={currentPage === 1}
+              />
+              <span>Page {currentPage} sur {totalPages}</span>
+              <Button
+                label="Suivant"
+                onClick={nextPage}
+                type="secondary"
+                disabled={currentPage === totalPages}
+              />
+            </div>
+          )}
         </div>
-        {paginatedReviews.map((review) => (
-          <div key={review.id} className="border-b pb-4 mb-4">
-            <p className="text-yellow-500">★ {review.rating}</p>
-            <p>
-              <strong>{review.user_name} :</strong> {review.comment}
-            </p>
-          </div>
-        ))}
-        {filteredReviews.length > reviewsPerPage && (
-          <div className="flex justify-between items-center mt-4">
-            <Button
-              label="Précédent"
-              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-              type="secondary"
-              disabled={currentPage === 1}
-            />
-            <Button
-              label="Suivant"
-              onClick={() =>
-                setCurrentPage((prev) =>
-                  Math.min(prev + 1, Math.ceil(filteredReviews.length / reviewsPerPage))
-                )
-              }
-              type="secondary"
-              disabled={currentPage === Math.ceil(filteredReviews.length / reviewsPerPage)}
-            />
-          </div>
-        )}
         <Button
           label="Exporter les avis"
           onClick={exportReviews}
@@ -329,6 +398,7 @@ const ProductDetailsPage: React.FC = () => {
       )}
 
       {/* Ajouter un avis */}
+      {}
       {error ? (
         <div className="bg-red-100 text-red-700 p-4 rounded-md">
           <ErrorComponent message={error} />
@@ -340,8 +410,8 @@ const ProductDetailsPage: React.FC = () => {
           <input
             type="text"
             placeholder="Votre nom"
-            value={newReview.user_name}
-            onChange={(e) => setNewReview({ ...newReview, user_name: e.target.value })}
+            value={newReview.user_id}
+            onChange={(e) => setNewReview({ ...newReview, user_id: e.target.value })}
             className="border rounded-md p-2"
           />
           <select
@@ -371,12 +441,10 @@ const ProductDetailsPage: React.FC = () => {
       <div className="mt-8">
         <h2 className="text-2xl font-bold mb-4">Produits recommandés</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-          {products
+          {recommendedProducts
             .filter(
               (item) =>
-                item.id !== product.id &&
-                item.category === product.category &&
-                Math.abs(item.price - product.price) < 100
+                item.id !== productItems[0].id
             )
             .map((recommendedProduct) => (
               <Card

@@ -2,15 +2,8 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Button from "../../components/Button.tsx";
 import Loader from "../../components/Loader.tsx";
-
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  role: string;
-  status: string;
-  joinedDate: string;
-}
+import { Users } from "../../entities/Users.tsx";
+import { fetchUser } from "../../services/UserService.ts";
 
 interface Action {
   id: number;
@@ -25,24 +18,37 @@ const UserProfilePage: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
 
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<Users[]>([]);
+  const [message, setMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [actions, setActions] = useState<Action[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState({ type: "Tous", status: "Tous" });
   const [notes, setNotes] = useState<string[]>([]);
   const [newNote, setNewNote] = useState("");
 
+  const convertion = (role: string) => {
+    if (role === "buyer") {return "Acheteur"}
+    else if (role === "seller") {return "Vendeur"}
+    else if (role === "admin") {return "Administrateur"}
+  };
+
   useEffect(() => {
     // Simuler la récupération des données utilisateur et des actions
     const fetchUserData = async () => {
-      const mockUser: User = {
-        id: Number(userId),
-        name: "Jean Dupont",
-        email: "jean.dupont@example.com",
-        role: "Acheteur",
-        status: "Actif",
-        joinedDate: "2024-10-15",
-      };
+      try {
+        setLoading(true);
+        setMessage(null);
+        const mockUser: Users[] = await fetchUser([userId || ""]);
+        setUser(mockUser);
+        setLoading(false);
+        setMessage(null);
+      } catch (error: any) {
+        setMessage("Erreur de chargement des utilisateurs.");
+        // toast.error(error.message || "Une erreur est survenue.");
+      } finally {
+        setLoading(false);
+      }
 
       const mockActions: Action[] = [
         {
@@ -69,8 +75,6 @@ const UserProfilePage: React.FC = () => {
           status: "Approuvé",
         },
       ];
-
-      setUser(mockUser);
       setActions(mockActions);
       setIsLoading(false);
     };
@@ -96,6 +100,8 @@ const UserProfilePage: React.FC = () => {
     return <div className="p-6 text-center text-red-500">Utilisateur non trouvé.</div>;
   }
 
+  if (loading) return <Loader />;
+
   return (
     <div className="p-6 max-w-6xl mx-auto bg-white shadow-md rounded-md">
       {/* En-tête */}
@@ -104,6 +110,7 @@ const UserProfilePage: React.FC = () => {
         <p className="text-gray-600">
           Affichez les informations détaillées et l'historique des actions de l'utilisateur.
         </p>
+        {message && <p className="mb-4 text-green-500">{message}</p>}
       </header>
 
       {/* Détails de l'utilisateur */}
@@ -112,30 +119,30 @@ const UserProfilePage: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
             <p>
-              <strong>Nom :</strong> {user.name}
+              <strong>Nom :</strong> {user[0].first_name} {user[0].last_name}
             </p>
             <p>
-              <strong>Email :</strong> {user.email}
+              <strong>Email :</strong> {user[0].email}
             </p>
           </div>
           <div>
             <p>
-              <strong>Rôle :</strong> {user.role}
+              <strong>Rôle :</strong> {convertion(user[0].role)}
             </p>
             <p>
               <strong>Statut :</strong>{" "}
               <span
                 className={`px-2 py-1 rounded-full text-white text-sm ${
-                  user.status === "Actif" ? "bg-green-500" : "bg-red-500"
+                  (user[0].is_active ? "Actif" : "Suspendu") === "Actif" ? "bg-green-500" : "bg-red-500"
                 }`}
               >
-                {user.status}
+                {user[0].is_active ? "Actif" : "Suspendu"}
               </span>
             </p>
           </div>
           <div>
             <p>
-              <strong>Date d'inscription :</strong> {user.joinedDate}
+              <strong>Date d'inscription :</strong> {user[0].created_at.split("T")[0]}
             </p>
           </div>
         </div>
@@ -243,7 +250,7 @@ const UserProfilePage: React.FC = () => {
         />
         <Button
           label="Modifier"
-          onClick={() => navigate(`/admin-user-management/edit/${user.id}`)}
+          onClick={() => navigate(`/admin-user-management/edit/${user[0].id}`)}
           className="bg-blue-500 text-white px-4 py-2 rounded-md"
         />
       </footer>

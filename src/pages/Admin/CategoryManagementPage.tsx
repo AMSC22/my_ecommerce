@@ -17,7 +17,6 @@ const CategoryManagementPage: React.FC = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  const user_id = "6796bc4f387b9c8670791537"
   // Chargement des données du Panier
   useEffect(() => {
     const loadCarts = async () => {

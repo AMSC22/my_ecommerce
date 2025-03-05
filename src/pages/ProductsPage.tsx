@@ -105,7 +105,7 @@ const ProductsPage: React.FC = () => {
       {/* Filtres */}
       <section className="flex flex-col md:flex-row gap-4 mb-6">
       <div className="flex flex-col">
-          <label className="font-semibold">Prix maximum : {filters.priceRange[1]} €</label>
+          <label className="font-semibold">Prix maximum : {filters.priceRange[1]} {products[0].currency}</label>
           <input
             type="range"
             min="0"

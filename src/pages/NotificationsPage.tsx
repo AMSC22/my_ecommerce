@@ -1,5 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Button from "../components/Button.tsx";
+import Loader from "../components/Loader.tsx";
+import { Notifications } from "../entities/Notification.tsx";
+import { fetchNotifications } from "../services/NotificationService.ts";
 
 interface Notification {
   id: number;
@@ -11,6 +14,9 @@ interface Notification {
 }
 
 const NotificationsPage: React.FC = () => {
+  const [message, setMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([
     {
       id: 1,
@@ -41,6 +47,36 @@ const NotificationsPage: React.FC = () => {
     { id: 6, title: "Nouveau message", message: "Vous avez reçu un nouveau message de John Doe.", type: "info", timestamp: "09/01/2025 10:20", read: false },
   ]);
 
+  const user_id = localStorage.getItem("user_id") || "";
+
+  const imageLink = "/images/";
+  
+  useEffect(() => {
+    if (!user_id) {
+      setError("Utilisateur non connecté !");
+      setLoading(false);
+      return;
+    }
+
+    const loadNotifications = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const notifications: Notifications[] = await fetchNotifications(user_id);
+        console.log("Notification = ", notifications);
+        setLoading(false);
+        setError(null);          
+      } catch (error: any) {
+        setError(error.message || "Une erreur est survenue.");
+        // toast.error(error.message || "Une erreur est survenue.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadNotifications();
+
+  }, [user_id]);
+    
   // Marquer une notification comme lue
   const markAsRead = (id: number) => {
     setNotifications(
@@ -64,6 +100,9 @@ const NotificationsPage: React.FC = () => {
   const clearAllNotifications = () => {
     setNotifications([]);
   };
+
+  if (loading) return <Loader />;
+  if (error) return <p className="text-center text-red-500">{error}</p>;
 
   return (
     <div className="p-6 bg-gray-100 min-h-screen shadow-md rounded-md">

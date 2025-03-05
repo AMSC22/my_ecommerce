@@ -1,6 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Button from "../../components/Button.tsx";
-import { useNavigate } from "react-router-dom";
+import Loader from "../../components/Loader.tsx";
+import { useNavigate, useParams } from "react-router-dom";
+import { Users } from "../../entities/Users.tsx";
+import { fetchAllUsers } from "../../services/UserService.ts";
+import { UpdateUserData, DeleteUser } from "../../services/UserService.ts";
+import { updateData } from "../../utils/UpdateFunction.ts";
 
 interface User {
   id: number;
@@ -13,49 +18,58 @@ interface User {
 
 const AdminUserManagementPage: React.FC = () => {
   const navigate = useNavigate();
+  const { seller } = useParams<{ sellers: string }>();
   const [searchQuery, setSearchQuery] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [filterRole, setFilterRole] = useState<"Tous" | "Acheteur" | "Vendeur" | "Administrateur">("Tous");
-  const [selectedUsers, setSelectedUsers] = useState<number[]>([]); // IDs des utilisateurs sélectionnés
-  const [users, setUsers] = useState<User[]>([
-    {
-      id: 1,
-      name: "Alice Dupont",
-      email: "alice@example.com",
-      role: "Acheteur",
-      status: "Actif",
-      joinedDate: "2024-12-01",
-    },
-    {
-      id: 2,
-      name: "Jean Martin",
-      email: "jean@example.com",
-      role: "Vendeur",
-      status: "Suspendu",
-      joinedDate: "2024-11-15",
-    },
-    {
-      id: 3,
-      name: "Marie Curie",
-      email: "marie@example.com",
-      role: "Administrateur",
-      status: "Actif",
-      joinedDate: "2024-10-05",
-    },
-  ]);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]); // IDs des utilisateurs sélectionnés
+  const [users, setUsers] = useState<Users[]>([]);
 
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<Users | null>(null);
   const [emailContent, setEmailContent] = useState("");
+  const user_id = localStorage.getItem("user_id") || ""; // Récupération de l'utilisateur connecté
+  
+  const convertion = (role: string) => {
+    if (role === "buyer") {return "Acheteur"}
+    else if (role === "seller") {return "Vendeur"}
+    else if (role === "admin") {return "Administrateur"}
+    else if (role === "Acheteur") {return "buyer"}
+    else if (role === "Vendeur") {return "seller"}
+    else if (role === "Administrateur") {return "admin"}
+  };
+  console.log("seller = ", seller);
 
+  // Chargement des données du Panier
+  useEffect(() => {
+    const loadCarts = async () => {
+      try {
+        setLoading(true);
+        setMessage(null);
+        const allUsers: Users[] = await fetchAllUsers();
+        setUsers(allUsers.filter((user) => user_id !== user.id));
+        setLoading(false);
+        setMessage(null);
+      } catch (error: any) {
+        setMessage("Erreur de chargement des utilisateurs.");
+        // toast.error(error.message || "Une erreur est survenue.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadCarts();
+  }, []);
+  
   // Pour exporter les données
   const exportData = () => {
     const csvContent = [
       ["Nom", "Email", "Rôle", "Statut", "Date d'inscription"],
       ...users.map((user) => [
-        user.name,
+        user.first_name + ' ' + user.last_name,
         user.email,
         user.role,
-        user.status,
-        user.joinedDate,
+        user.is_active ? "Actif" : "Suspendu",
+        user.created_at,
       ]),
     ]
       .map((row) => row.join(","))
@@ -92,29 +106,64 @@ const AdminUserManagementPage: React.FC = () => {
     setSelectedUsers([]); // Réinitialiser les sélections après action
   };
   
-  const handleToggleStatus = (id: number) => {
-    setUsers((prevUsers) =>
-      prevUsers.map((user) =>
-        user.id === id ? { ...user, status: user.status === "Actif" ? "Suspendu" : "Actif" } : user
-      )
-    );
+  const handleToggleStatus = async (id: string, is_active: boolean) => {
+    try {
+      const response = await UpdateUserData(id, updateData(id, users, ["is_active"], [!is_active]));
+
+      if (response) {
+        setUsers((prevUsers) =>
+          prevUsers.map((user) =>
+            user.id === id ? { ...user, status: (user.is_active ? "Actif" : "Suspendu") === "Actif" ? "Suspendu" : "Actif" } : user
+          )
+        );
+      } else {
+        setMessage("Erreur lors du changement du statut de l'utilisateur.");
+      }
+    } catch (error) {
+      console.error(error);
+      setMessage("Erreur de connexion au serveur.");
+    }
+
   };
 
   // Gérer la selection des utilisateurs
-  const handleDeleteUser = (id: number) => {
-    setUsers((prevUsers) => prevUsers.filter((user) => user.id !== id));
+  const handleDeleteUser = async (id: string) => {
+    try {
+      const response = await DeleteUser(id);
+
+      if (response) {
+        setUsers((prevUsers) => prevUsers.filter((user) => user.id !== id));
+      } else {
+        setMessage("Erreur lors de la suppression de l'utilisateur.");
+      }
+    } catch (error) {
+      console.error(error);
+      setMessage("Erreur de connexion au serveur.");
+    }
   };
 
-  const handleRoleChange = (id: number, newRole: "Acheteur" | "Vendeur" | "Administrateur") => {
-    setUsers((prevUsers) =>
-      prevUsers.map((user) => (user.id === id ? { ...user, role: newRole } : user))
-    );
+  const handleRoleChange = async (id: string, newRole: "Acheteur" | "Vendeur" | "Administrateur") => {
+    try {
+      const response = await UpdateUserData(id, updateData(id, users, ["role"], [convertion(newRole)]));
+
+      if (response.ok) {
+        setUsers((prevUsers) =>
+          prevUsers.map((user) => (user.id === id ? { ...user, role: newRole } : user))
+        );
+      } else {
+        setMessage("Erreur lors de la modification du role de l'utilisateur.");
+      }
+    } catch (error) {
+      console.error(error);
+      setMessage("Erreur de connexion au serveur.");
+    }
   };
 
   const filteredUsers = users.filter(
     (user) =>
-      (filterRole === "Tous" || user.role === filterRole) &&
-      (user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (filterRole === "Tous" || convertion(user.role) === filterRole) &&
+      (user.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+       user.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         user.email.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
@@ -125,12 +174,15 @@ const AdminUserManagementPage: React.FC = () => {
     setSelectedUser(null);
   };
 
+  if (loading) return <Loader />;
+
   return (
     <div className="p-6">
       {/* En-tête */}
       <header className="mb-6">
         <h1 className="text-3xl font-bold">Gestion des utilisateurs</h1>
         <p className="text-gray-600">Recherchez, filtrez et gérez les utilisateurs de la plateforme.</p>
+        {message && <p className="mb-4 text-green-500">{message}</p>}
       </header>
 
       {/* Barre de recherche, filtres et exportation */}
@@ -150,7 +202,7 @@ const AdminUserManagementPage: React.FC = () => {
           <option value="Tous">Tous les rôles</option>
           <option value="Acheteur">Acheteurs</option>
           <option value="Vendeur">Vendeurs</option>
-          <option value="Administrateur">Administrateurs</option>
+          <option value="Administrateur">Administrateur</option>
         </select>
         <Button
           label="Exporter les données"
@@ -192,47 +244,50 @@ const AdminUserManagementPage: React.FC = () => {
             {filteredUsers.length > 0 ? (
               filteredUsers.map((user) => (
                 <tr key={user.id} className="hover:bg-gray-50">
-                  <td className="border p-2">{user.name}</td>
+                  <td className="border p-2">{user.first_name} {user.last_name}</td>
                   <td className="border p-2">{user.email}</td>
+                  {user.role !== "admin" ? 
                   <td className="border p-2">
                     <select
-                      value={user.role}
-                      onChange={(e) =>
-                        handleRoleChange(user.id, e.target.value as "Acheteur" | "Vendeur" | "Administrateur")
-                      }
-                      className="border rounded-md p-1"
-                    >
-                      <option value="Acheteur">Acheteur</option>
-                      <option value="Vendeur">Vendeur</option>
-                      <option value="Administrateur">Administrateur</option>
-                    </select>
-                  </td>
+                    value={convertion(user.role)}
+                    onChange={(e) =>
+                      handleRoleChange(user.id, e.target.value as "Acheteur" | "Vendeur" | "Administrateur")
+                    }
+                    className="border rounded-md p-1"
+                  >
+                    <option value="Acheteur">Acheteur</option>
+                    <option value="Vendeur">Vendeur</option>
+                    <option value="Administrateur">Administrateur</option>
+                  </select>
+                  </td> : <td className="border p-2">{user.role}</td>}
                   <td className="border p-2">
                     <span
                       className={`px-2 py-1 rounded-full text-white text-sm ${
-                        user.status === "Actif" ? "bg-green-500" : "bg-red-500"
+                        (user.is_active ? "Actif" : "Suspendu") === "Actif" ? "bg-green-500" : "bg-red-500"
                       }`}
                     >
-                      {user.status}
+                      {user.is_active ? "Actif" : "Suspendu"}
                     </span>
                   </td>
-                  <td className="border p-2">{user.joinedDate}</td>
+                  <td className="border p-2">{user.created_at.split("T")[0]}</td>
                   <td className="border p-2 flex gap-2">
                     <Button
                       label="Détails"
                       onClick={() => setSelectedUser(user)}
                       className="bg-blue-500 text-white px-2 py-1 rounded-md"
                     />
+                    {user.role !== "admin" ?
+                    <>
                     <Button
                       label="Voir le profil"
                       onClick={() => navigate(`/admin-user-profile/${user.id}`)}
                       className="bg-blue-500 text-white px-2 py-1 rounded-md"
                     />
                     <Button
-                      label={user.status === "Actif" ? "Suspendre" : "Activer"}
-                      onClick={() => handleToggleStatus(user.id)}
+                      label={(user.is_active ? "Actif" : "Suspendu") === "Actif" ? "Suspendre" : "Activer"}
+                      onClick={() => handleToggleStatus(user.id, user.is_active)}
                       className={`${
-                        user.status === "Actif" ? "bg-red-500" : "bg-green-500"
+                        (user.is_active ? "Actif" : "Suspendu") === "Actif" ? "bg-red-500" : "bg-green-500"
                       } text-white px-2 py-1 rounded-md`}
                     />
                     <Button
@@ -240,6 +295,8 @@ const AdminUserManagementPage: React.FC = () => {
                       onClick={() => handleDeleteUser(user.id)}
                       className="bg-gray-600 text-white px-2 py-1 rounded-md"
                     />
+                    </>
+                    :(undefined)}
                   </td>
                 </tr>
               ))
@@ -259,11 +316,11 @@ const AdminUserManagementPage: React.FC = () => {
         <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-white p-6 rounded-md shadow-md max-w-md w-full">
             <h2 className="text-xl font-bold mb-4">Détails de l'utilisateur</h2>
-            <p><strong>Nom :</strong> {selectedUser.name}</p>
+            <p><strong>Nom :</strong> {selectedUser.first_name} {selectedUser.last_name}</p>
             <p><strong>Email :</strong> {selectedUser.email}</p>
-            <p><strong>Rôle :</strong> {selectedUser.role}</p>
-            <p><strong>Statut :</strong> {selectedUser.status}</p>
-            <p><strong>Date d'inscription :</strong> {selectedUser.joinedDate}</p>
+            <p><strong>Rôle :</strong> {convertion(selectedUser.role)}</p>
+            <p><strong>Statut :</strong> {selectedUser.is_active ? "Actif" : "Suspendu"}</p>
+            <p><strong>Date d'inscription :</strong> {selectedUser.created_at.split("T")[0]}</p>
 
             <div className="mt-4">
               <textarea

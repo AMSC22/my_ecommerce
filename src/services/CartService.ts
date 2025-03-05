@@ -2,13 +2,14 @@ import apiAxios from "../api/axios.ts";
 import { ErreurMessage } from "../utils/ErrorMessage.ts";
 import { Carts } from "../entities/Carts.tsx";
 
-const api = apiAxios("http://127.0.0.1:8000/api/v1/");
+const api = apiAxios("/api/v1/");
 
 // Récupérer le Panier d'un utilisateur
 export const fetchCarts = async (user_id: string): Promise<Carts[]> => {
   try {
     const { data } = await api.get(`carts/user_id/?user_id=${user_id}`);
-    const ProductCart: Carts[] = Object.entries(data[0].items).map(([key, value]: [string, any]) => ({
+    if (!data || data.length === 0) return data;
+    const ProductCart: Carts[] = Object.entries(data[0].items).map((value: any) => ({
         product_id: value.product_id,
         quantity: value.quantity,
         name: value.name,

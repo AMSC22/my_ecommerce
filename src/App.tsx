@@ -55,19 +55,28 @@ import OtherProfilePage from "./pages/OtherProfilePage.tsx";
 import AdminReviewManagementPage from "./pages/Admin/AdminReviewManagementPage.tsx";
 import UserProfilePage from "./pages/Admin/UserProfilePage.tsx";
 import AdminUserManagementEditPage from "./pages/Admin/AdminUserManagementEdit.tsx";
+import AdminProductManagementPage from "./pages/Admin/AdminProductManagement.tsx";
 import CategoryManagementPage from "./pages/Admin/CategoryManagementPage.tsx";
 import SellerReviewPage from "./pages/Sellers/SellerReviewPage.tsx";
 
 const App: React.FC = () => {
-  const status: string = "admin";
-  const isLoggedIn: boolean = true;
-  let path: any;
 
-  if(isLoggedIn){
-  if (status === "buyer"){ path = <BuyerDashboardPage />; }
-  else if (status === "seller"){ path = <SellerDashboardPage />; }
-  else if (status === "admin"){ path = <AdminDashboardPage />; }}
-  else { path = <HomePage />; }
+  const status: string = localStorage.getItem("user_role") || "";
+  const isLoggedIn: boolean = Boolean(status); // si status est vide, isLoggedIn sera false
+  let path: JSX.Element;
+
+  if (!isLoggedIn) {
+    path = <HomePage />;
+  } else if (status === "buyer") {
+    path = <BuyerDashboardPage />;
+  } else if (status === "seller") {
+    path = <SellerDashboardPage />;
+  } else if (status === "admin") {
+    path = <AdminDashboardPage />;
+  } else {
+    // Optionnel : si status a une autre valeur inattendue, on peut afficher HomePage par défaut.
+    path = <HomePage />;
+  }
 
   return (
     <Router>
@@ -104,7 +113,7 @@ const App: React.FC = () => {
             <Route path="/favorites" element={<FavoritesPage />} />
             <Route path="/affiliation" element={<AffiliationPage />} />
             <Route path="/subscriptions" element={<SubscriptionPage />} />
-            <Route path="/other-profile" element={<OtherProfilePage />} />
+            <Route path="/other-profile/:userId" element={<OtherProfilePage />} />
             
             <Route path="/admin-user-management" element={<AdminUserManagementPage />} />
             <Route path="/admin-order-management" element={<AdminOrderManagementPage />} />
@@ -113,6 +122,7 @@ const App: React.FC = () => {
             <Route path="/admin-validation-category" element={<AdminCategoryValidationPage />} />
             <Route path="/admin-statistics" element={<AdminStatePage />} />
             <Route path="/admin-review-management" element={<AdminReviewManagementPage />} />
+            <Route path="/admin-product-management" element={<AdminProductManagementPage />} />
             <Route path="/admin-user-profile/:userId" element={<UserProfilePage />} />
             <Route path="/admin-user-management/edit/:userId" element={<AdminUserManagementEditPage />} />
             <Route path="/admin-category-management" element={<CategoryManagementPage />} />

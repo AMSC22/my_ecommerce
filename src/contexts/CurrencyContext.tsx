@@ -1,8 +1,12 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, ReactNode } from "react";
 
 const CurrencyContext = createContext<any>(null);
 
-export const CurrencyProvider: React.FC = ({ children }) => {
+interface CurrencyProviderProps {
+  children: ReactNode;
+}
+
+export const CurrencyProvider = ({ children }: CurrencyProviderProps) => {
   const [currency, setCurrency] = useState("EUR");
   const [exchangeRates, setExchangeRates] = useState({ EUR: 1, USD: 1.2, XAF: 655 });
 
@@ -10,8 +14,10 @@ export const CurrencyProvider: React.FC = ({ children }) => {
     return (price * exchangeRates[currency]).toFixed(2);
   };
 
+  const value = { currency, setCurrency, convertPrice };
+
   return (
-    <CurrencyContext.Provider value={{ currency, setCurrency, convertPrice }}>
+    <CurrencyContext.Provider value={value}>
       {children}
     </CurrencyContext.Provider>
   );

@@ -6,6 +6,8 @@ import { Product } from "../../entities/Product.tsx";
 import { DeleteProduct, fetchallInactiveProducts, fetchallPendingProducts, UpdateProduct } from "../../services/ProductService.ts"
 import { updateData } from "../../utils/UpdateFunction.ts";
 import { filterAndSortProduct } from "../../utils/ProductUtils.ts";
+import { Category } from "../../entities/Categories.tsx";
+import { CategoryIdName } from "../../services/CategoryService.ts";
 
 const AdminProductValidationPage: React.FC = () => {
   const navigate = useNavigate();
@@ -14,9 +16,9 @@ const AdminProductValidationPage: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<{ id: string, newCategory: string } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [search, setSearch] = useState<string>("");
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const user_id = "6796bc4f387b9c8670791537"
   // Chargement des données du Panier
   useEffect(() => {
     const loadCarts = async () => {
@@ -44,13 +46,14 @@ const AdminProductValidationPage: React.FC = () => {
     if (selectedCategory && selectedCategory.id === product_id) {
       const updatedProduct = updateData(product_id, pendingProducts, ["category_id"], [selectedCategory.newCategory]);
       await UpdateProduct(product_id, updatedProduct);
+      const categorys = await CategoryIdName();
       setPendingProducts((prevProducts) => 
         prevProducts.map((p) => 
-          p.id === product_id ? {...p, category_id: selectedCategory.newCategory} : p));
+          p.id === product_id ? {...p, category_id: categorys[selectedCategory.newCategory]} : p));
       setSelectedCategory(null);
     }
   };
-  
+
   // Fonction pour valider un produit
   const handleValidateProduct = async (product_id: string) => {
     try {
@@ -140,7 +143,7 @@ const AdminProductValidationPage: React.FC = () => {
 
       {/* Navigation vers les Catégories en actives */}
       <div className="flex justify-end gap-4 mb-6">
-        <Button label="Voir les Produits Validés" onClick={() => navigate("/admin-produts")}></Button>
+        <Button label="Voir les Produits Validés" onClick={() => navigate("/admin-product-management")}></Button>
       </div>
 
       {/* Filtres */}
@@ -167,11 +170,14 @@ const AdminProductValidationPage: React.FC = () => {
                 <p className="text-sm">{product.description}</p>
                 <p className="text-blue-600 font-semibold">{product.price} {product.currency}</p>
                 <p className="text-gray-500 text-sm">Catégorie : {selectedCategory?.id === product.id ? 
-                ( <input type="text"
-                  className="border ml-2 p-1 rounded-md" 
-                  value={selectedCategory.newCategory} 
-                  onChange={(e) => setSelectedCategory({ id: product.id, newCategory: (e.target as HTMLInputElement).value })}
-                  onBlur={(e) => handleEditCategory(product.id)} />) : (
+                ( <select value={selectedCategory.newCategory} 
+                    onChange={(e) => setSelectedCategory({ id: product.id, newCategory: (e.target).value })}
+                    onKeyDown={(e) => e.key === "Enter" && handleEditCategory(product.id)}
+                    className="border ml-2 p-1 rounded-md" >{categories.map((category) => (
+                        <option key={category.id} value={category.id}>{category.name}</option>))}
+                        <option disabled>----------</option>
+                        <option value="new">+ Créer une nouvelle catégorie</option></select>
+                ) : (
                   <span onDoubleClick={(e) => setSelectedCategory({ id: product.id, newCategory: product.category_id })}>{product.category_id}</span>)}</p>
                 <div className="flex justify-between mt-4">
                   <Button label="Valider" onClick={() => handleValidateProduct(product.id)} />

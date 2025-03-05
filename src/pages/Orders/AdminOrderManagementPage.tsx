@@ -1,11 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Button from "../../components/Button.tsx";
+import Loader from "../../components/Loader.tsx";
+import { fetchAdminOrders } from "../../services/OrderService.ts";
 
-interface Order {
+interface Orders {
   id: number;
   customerName: string;
-  items: { productName: string; quantity: number; price: number }[];
+  items: { productName: string; quantity: number; price: number; currency: string; }[];
   total: number;
+  currency?: string;
   status: "En attente" | "En cours" | "Expédiée" | "Livrée" | "Annulé";
   orderDate: string;
 }
@@ -17,13 +20,13 @@ const AdminOrderManagementPage: React.FC = () => {
   >("Tous");
   const [sortField, setSortField] = useState<"id" | "customerName" | "total" | "orderDate">("id");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
-  const [orders, setOrders] = useState<Order[]>([
+  const [orders, setOrders] = useState<Orders[]>([
     {
       id: 1,
       customerName: "Alice Dupont",
       items: [
-        { productName: "Smartphone XYZ", quantity: 1, price: 699.99 },
-        { productName: "Casque Bluetooth ABC", quantity: 2, price: 59.99 },
+        { productName: "Smartphone XYZ", quantity: 1, price: 699.99, currency: "string", },
+        { productName: "Casque Bluetooth ABC", quantity: 2, price: 59.99, currency: "string", },
       ],
       total: 819.97,
       status: "En attente",
@@ -32,14 +35,36 @@ const AdminOrderManagementPage: React.FC = () => {
     {
       id: 2,
       customerName: "Jean Martin",
-      items: [{ productName: "Tablette DEF", quantity: 1, price: 499.99 }],
+      items: [{ productName: "Tablette DEF", quantity: 1, price: 499.99, currency: "string" }],
       total: 499.99,
       status: "Livrée",
       orderDate: "2025-01-08",
     },
   ]);
 
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<Orders | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  
+  // Chargement des commandes
+  useEffect(() => {
+    const loadCarts = async () => {
+      try {
+        setLoading(true);
+        setMessage(null);
+        const allOrders: Orders[] = await fetchAdminOrders();
+        setOrders(allOrders);
+        setLoading(false);
+        setMessage(null);
+      } catch (error: any) {
+        setMessage("Erreur de chargement des catégories.");
+        // toast.error(error.message || "Une erreur est survenue.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadCarts();
+  }, []);
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -59,7 +84,7 @@ const AdminOrderManagementPage: React.FC = () => {
 
   const handleExport = () => {
     const csvContent = [
-      ["ID", "Nom du client", "Total (€)", "Statut", "Date de commande"],
+      ["ID", "Nom du client", `Total`, "Statut", "Date de commande"],
       ...orders.map((order) => [
         order.id,
         order.customerName,
@@ -99,6 +124,8 @@ const AdminOrderManagementPage: React.FC = () => {
     }
     return 0; // Si les champs ne sont ni des nombres ni des chaînes (peu probable ici)
   });
+
+  if (loading) return <Loader />;
 
   return (
     <div className="p-6">
@@ -168,7 +195,7 @@ const AdminOrderManagementPage: React.FC = () => {
                 <tr key={order.id} className="hover:bg-gray-50">
                   <td className="border p-2">{order.id}</td>
                   <td className="border p-2">{order.customerName}</td>
-                  <td className="border p-2">{order.total.toFixed(2)} €</td>
+                  <td className="border p-2">{order.total.toFixed(2)} {order.currency}</td>
                   <td className="border p-2">{order.status}</td>
                   <td className="border p-2">{order.orderDate}</td>
                   <td className="border p-2">
@@ -217,7 +244,7 @@ const AdminOrderManagementPage: React.FC = () => {
                       <strong>{item.productName}</strong>
                     </p>
                     <p>Quantité : {item.quantity}</p>
-                    <p>Prix : {item.price.toFixed(2)} €</p>
+                    <p>Prix : {item.price.toFixed(2)} {item.currency}</p>
                   </li>
                 ))}
               </ul>

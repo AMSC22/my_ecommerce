@@ -14,9 +14,8 @@ const AdminCategoryValidationPage: React.FC = () => {
   const [message, setMessage] = useState<string | null>(null);
   const [search, setSearch] = useState<string>("");
   const [loading, setLoading] = useState(true);
-
-  const user_id = "6796bc4f387b9c8670791537"
-  // Chargement des données du Panier
+  
+// Chargement des données du Panier
   useEffect(() => {
     const loadCarts = async () => {
       try {
@@ -118,6 +117,7 @@ const AdminCategoryValidationPage: React.FC = () => {
 
   const filteredPendingCategoy = filterAndSortCategories(pendingCategories, search, "", "");
   const filteredInactiveCategory = filterAndSortCategories(inactivecategories, search, "", "");
+  
   if (loading) return <Loader />;
 
   return (

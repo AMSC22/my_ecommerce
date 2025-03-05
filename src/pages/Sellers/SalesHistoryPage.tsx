@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import Button from "../../components/Button.tsx";
-import { useNavigate } from "react-router-dom";
+import Loader from "../../components/Loader.tsx";
+import { useNavigate, useLocation } from "react-router-dom";
+import { fetchOrders } from "../../services/OrderService.ts";
 
 interface Sale {
   id: number;
@@ -13,56 +15,79 @@ interface Sale {
     image: string;
   }[];
   total: number;
+  currency: string,
+  buyerId: string,
   status: string;
 }
 
 const SalesHistoryPage: React.FC = () => {
+  const location = useLocation(); // Récupérer les données transmises par SellerDashbord
   const [sales, setSales] = useState<Sale[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("Tous");
   const [filterDate, setFilterDate] = useState<string>("");
   const [filterProduct, setFilterProduct] = useState<string>("Tous");
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  
+  const user_id = localStorage.getItem("user_id") || ""; // Récupération de l'utilisateur connecté
 
-  const datas = [
-    {
-      id: 1,
-      date: "2025-01-10",
-      buyer: "John Doe",
-      items: [
-        { name: "Smartphone XYZ", quantity: 1, price: 699.99, image: "https://example.com/smartphone.jpg" },
-        { name: "Étui pour smartphone", quantity: 2, price: 19.99, image: "https://example.com/case.jpg" },
-      ],
-      total: 739.97,
-      status: "Livré",
-    },
-    {
-      id: 2,
-      date: "2025-01-08",
-      buyer: "Jane Smith",
-      items: [
-        { name: "Casque Bluetooth", quantity: 1, price: 49.99, image: "https://example.com/headphone.jpg" },
-      ],
-      total: 49.99,
-      status: "En attente",
-    },
-  ];
-
-  // Fetch historique des ventes
+  // Récupérer les données transmises par la page SellerDashbord
   useEffect(() => {
+    
     const fetchSales = async () => {
+      if (!user_id) {
+        setMessage("Utilisateur non connecté !");
+        setLoading(false);
+        return;
+      }
       try {
-        // const response = await fetch("/api/sales");
-        const data = datas; // await response.json();
-        setSales(data);
+        setLoading(true);
+        const Orders = await fetchOrders([user_id]);
+        const sellerData = Orders.map((value) => ({
+          id: value.id,
+          date: value.date.split("T")[0],
+          buyer: value.buyer,
+          items: [
+            { name: value.productName, 
+              quantity: value.quantity, 
+              price: value.price, 
+              image: value.image }],
+          total: value.price * value.quantity,
+          status: value.status,
+          currency: value.currency,
+          buyerId: value.buyer_id,
+        }));
+        setSales(sellerData);
+        setLoading(false);
       } catch (error) {
-        console.error("Erreur lors du chargement de l'historique :", error);
         setMessage("Erreur de chargement. Veuillez réessayer plus tard.");
+      } finally {
+        setLoading(false);
       }
     };
+    
+    if (location.state && location.state.saleId) {
+      const sellerData = [{
+          id: location.state.saleId.id,
+          date: location.state.saleId.date.split("T")[0],
+          buyer: location.state.saleId.buyer,
+          items: [
+            { name: location.state.saleId.productName, 
+              quantity: location.state.saleId.quantity, 
+              price: location.state.saleId.price, 
+              image: location.state.saleId.image }],
+          total: location.state.saleId.price * location.state.saleId.quantity,
+          status: location.state.saleId.status,
+          currency: location.state.saleId.currency,
+          buyerId: location.state.saleId.buyer_id,
+        }]
+      setSales(sellerData);
+    }else{
+      fetchSales();
+    }
 
-    fetchSales();
-  }, []);
+  }, [location]);
 
   // Filtrer les ventes
   const filteredSales = sales.filter((sale) => {
@@ -83,7 +108,7 @@ const SalesHistoryPage: React.FC = () => {
         sale.date,
         sale.buyer,
         sale.items.map((item) => `${item.name} (x${item.quantity})`).join(", "),
-        `${sale.total} €`,
+        `${sale.total} ${sale.currency}`,
         sale.status,
       ]),
     ]
@@ -100,6 +125,8 @@ const SalesHistoryPage: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  if (loading) return <Loader />;
+  
   return (
     <div className="p-6">
       <h1 className="text-3xl font-bold mb-6">Historique des ventes</h1>
@@ -164,14 +191,14 @@ const SalesHistoryPage: React.FC = () => {
                     <div>
                       <h3 className="font-bold">{item.name}</h3>
                       <p>
-                        Quantité : {item.quantity} | Prix : {item.price} €
+                        Quantité : {item.quantity} | Prix : {item.price} {sale.currency}
                       </p>
                     </div>
                   </div>
                 ))}
               </div>
               <div className="flex justify-between items-center">
-                <p className="font-semibold text-lg">Total : {sale.total} €</p>
+                <p className="font-semibold text-lg">Total : {sale.total} {sale.currency}</p>
                 <p
                   className={`${
                     sale.status === "Livré"
@@ -185,7 +212,7 @@ const SalesHistoryPage: React.FC = () => {
               <div className="text-right mt-4">
                 <Button
                   label="Contacter l'acheteur"
-                  onClick={() => navigate("/message")}
+                  onClick={() => navigate("/message", { state: { buyerId: sale.buyerId } })}
                   className="bg-blue-600 text-white px-4 py-2 rounded-md"
                 />
               </div>

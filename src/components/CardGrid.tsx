@@ -1,6 +1,5 @@
 import React from 'react'
 import Card from "./Card.tsx";
-import Button from "./Button.tsx";
 
 const CardGrid: React.FC = () => {
     return (

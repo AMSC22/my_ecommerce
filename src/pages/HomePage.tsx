@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import Button from "../components/Button.tsx";
 import Card from "../components/Card.tsx";
 import FormComponent from "../components/FormComponent.tsx";
-import Banner from "../components/Banner.tsx";
 import CurrencySelector from "../components/CurrencySelector.tsx";
 
 const HomePage: React.FC = () => {

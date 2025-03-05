@@ -1,6 +1,6 @@
 // Fonction pour modifier la valeur d'un élément dans une liste
 
-export const updateData = (element_id: string, elements: any, elementState: string[], value: any) => {
+export const updateData = (element_id: string, elements: any[], elementState: string[] = [], value: any) => {
     // Trouver l'index de l'élément dans la liste 'elements'
     const elementIndex = elements.findIndex(element => element.id === element_id);
     console.log("elenetIndex = ", elementIndex);

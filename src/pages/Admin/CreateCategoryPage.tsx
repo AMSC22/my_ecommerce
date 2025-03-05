@@ -15,7 +15,8 @@ const CreateCategoryPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [icon_url, setIcon_url] = useState<string>("");
 
-  const user_id = "6796bc4f387b9c8670791537"
+  const user_id = localStorage.getItem("x-user-id") || "";
+  
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const file = e.target.files[0];
@@ -59,12 +60,12 @@ const CreateCategoryPage: React.FC = () => {
       // Création d'une catégorie
       setLoading(true);
       setError(null);
-      const allwishlists: Category[] = await CreateCategory(formData);
+      const allCategory: Category[] = await CreateCategory(formData);
       setLoading(false);
       setError(null);          
         
 
-      if (allwishlists) {
+      if (allCategory) {
         setMessage("Catégorie créée avec succès !");
         // Redirection vers CategoryManagementPage
         setTimeout(() => navigate("/admin-category-management"), 2000);

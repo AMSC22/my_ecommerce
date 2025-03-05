@@ -1,23 +1,34 @@
-import axios from "axios";
-// import Cookies from "js-cookie";
+// import axios from "axios";
+// // import Cookies from "js-cookie";
 
-const apiAxios = (BASE_URL) => {
+// // Créer une instance Axios
+// const apiAxios = (BASE_URL) => {
 
-  const api = axios.create({
-    baseURL: BASE_URL,
-    headers: {
-      "accept": "application/json"
-    },
-  })
-  api.interceptors.request.use(request => {
-    request.headers = {
-      "Authorization": "Bearer " //+ Cookies.get('access_token')
-    }
+//   const api = axios.create({
+//     baseURL: BASE_URL,
+//     headers: {
+//       "accept": "application/json"
+//     },
+//   })
 
-    return request
-  })
+//   // Intercepter chaque réquete envoyée
+//   api.interceptors.request.use(request => {
+//     request.headers = {
+//       "Authorization": "Bearer " //+ Cookies.get('access_token')
+//     }
 
-  return api
-}
+//     return request
+//   })
 
-export default apiAxios
+//   // Intercepter chaque réponse pour récupérer le role
+//   api.interceptors.response.use((response) => {
+//     if (response.headers["x-user-role"]) {
+//       localStorage.setItem("user_role", response.headers["x-user-role"]);
+//     }
+//     return response;
+//   });
+
+//   return api
+// }
+
+// export default apiAxios

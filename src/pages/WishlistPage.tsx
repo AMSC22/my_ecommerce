@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Loader from "../components/Loader.tsx";
 import { Wishlists } from "../entities/wishlists";
-import { fetchWishlists, updateWishlist, removeWishlistItem } from "../services/WishlistService.ts";
+import { fetchWishlists, removeWishlistItem } from "../services/WishlistService.ts";
 import ErrorComponent from "../components/ErrorComponent.tsx";
 
 const WishlistPage: React.FC = () => {
@@ -11,26 +11,36 @@ const WishlistPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const user_id = "6796bc4f387b9c8670791537"
-  // Chargement des données de la liste des Souhaits
-  useEffect(() => {
-    const loadWishlists = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const allwishlists: Wishlists[] = await fetchWishlists(user_id);
-        setWishlist(allwishlists);
-        setLoading(false);
-        setError(null);          
-      } catch (error: any) {
-        setError(error.message || "Une erreur est survenue.");
-        // toast.error(error.message || "Une erreur est survenue.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadWishlists();
-  }, []);
+    // 🔹 Vérification que `user_id` est bien récupéré
+    const user_id = localStorage.getItem("user_id") || "";
+    if (!user_id) {
+      console.warn("⚠️ Avertissement: Aucun `user_id` trouvé dans localStorage.");
+    }
+  
+    // 🛒 Chargement des données du Panier
+    useEffect(() => {
+      const loadWishlists = async () => {
+        try {
+          setLoading(true);
+          setError(null);
+  
+          // 🔹 Vérification que `fetchCarts` retourne bien des données
+          const allWishlists: Wishlists[] = await fetchWishlists(user_id);
+          if (!allWishlists || allWishlists.length === 0) {
+            setWishlist([]);
+            setLoading(false);
+          }
+  
+          setWishlist(allWishlists);
+        } catch (error: any) {
+          setError(error.response?.data?.detail || error.message || "Une erreur est survenue.");
+          // toast.error(error.message || "Une erreur est survenue.");
+        } finally {
+          setLoading(false);
+        }
+      };
+      loadWishlists();
+    }, [user_id]);
   
   const removeFromWishlist = async (product_id: string) => {
     if (!wishlist) return;

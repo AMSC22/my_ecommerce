@@ -1,8 +1,9 @@
 import apiAxios from "../api/axios.ts";
 import { Product } from "../entities/Product.tsx";
 import { ErreurMessage } from "../utils/ErrorMessage.ts";
+import { CategoryIdName } from "./CategoryService.ts";
 
-const api = apiAxios("http://127.0.0.1:8000/api/v1/");
+const api = apiAxios("/api/v1/");
 
 // Fonction pour organiser et filtrer les catégories
 export const processProducts = (products: Product[]) => {
@@ -43,7 +44,42 @@ export const fetchallPendingProducts = async (): Promise<Product[]> => {
   }
 };
 
-// Fonction pour récupérer la liste des produits en attente de validité
+// Fonction pour récupérer la liste des produits validités d'un vendeur
+export const fetchSellerValidetedProducts = async (seller_id: string[] = []): Promise<Product[]> => {
+  try {
+    const { data } = await api.post("products/seller_id/", seller_id=seller_id);
+    const { validatedProducts } = await processProducts(data)
+    return validatedProducts;
+  } catch (error) {
+    ErreurMessage(error);
+    return [];
+  }
+};
+
+// Fonction pour récupérer la liste des produits d'un vendeur
+export const fetchSellerProducts = async (seller_id: string[]): Promise<Product[]> => {
+  try {
+    const { data } = await api.post("products/seller_id/", seller_id=seller_id);
+    return data;
+  } catch (error) {
+    ErreurMessage(error);
+    return [];
+  }
+};
+
+// Fonction pour récupérer la liste de tous les produits validités pour admin
+export const fetchAllValidatedProducts = async (): Promise<Product[]> => {
+  try {
+    const { data } = await api.get("products/");
+    const { validatedProducts } = await processProducts(data)
+    return validatedProducts;
+  } catch (error) {
+    ErreurMessage(error);
+    return [];
+  }
+};
+
+// Fonction pour récupérer la liste des produits en attente de validité  pour admin
 export const fetchallInactiveProducts = async (): Promise<Product[]> => {
   try {
     const { data } = await api.get("products/");
@@ -67,25 +103,25 @@ export const fetchProducts = async (category_id: string): Promise<Product[]> => 
 };
 
 // Fonction pour récupérer la liste des produits validés d'une catégorie
-export const fetchvalidatedProducts = async (category_id): Promise<Product[]> => {
+export const fetchvalidatedProducts = async (category_id: any): Promise<Product[]> => {
     const { validatedProducts } = await processProducts(await fetchProducts(category_id));
       return validatedProducts;
 };
 
 // Fonction pour récupérer la liste des produits non validés d'une catégorie
-export const fetchunvalidatedProducts = async (category_id): Promise<Product[]> => {
+export const fetchunvalidatedProducts = async (category_id: any): Promise<Product[]> => {
     const { unvalidatedProducts } = await processProducts(await fetchProducts(category_id));
       return unvalidatedProducts;
 };
 
 // Fonction pour récupérer la liste des produits en attente d'une catégorie pour etre affichés aux acheteurs
-export const fetchpendingProducts = async (category_id): Promise<Product[]> => {
+export const fetchpendingProducts = async (category_id: any): Promise<Product[]> => {
     const { pendingProducts } = await processProducts(await fetchProducts(category_id));
       return pendingProducts;
 };
 
 // Fonction pour récupérer la liste des produits inactifs d'une catégorie
-export const fetchinactiveProducts = async (category_id): Promise<Product[]> => {
+export const fetchinactiveProducts = async (category_id: any): Promise<Product[]> => {
     const { inactiveProducts } = await processProducts(await fetchProducts(category_id));
       return inactiveProducts;
 };
@@ -93,6 +129,7 @@ export const fetchinactiveProducts = async (category_id): Promise<Product[]> => 
 // Fonction pour récupérer calculer le nombre de produits validés d'une catégorie
 export const fetchProductStats = async (products: Product[]): Promise<Product[]> => {
   try {
+    const categories = await CategoryIdName();
     const query = products.map((product) => product.id);
     const { data } = await api.post("product_reviews/product_rating/", {product_ids: query});
     const ProductData: Product[] = Object.entries(products).map(([key, value]: [string, Product]) => ({
@@ -103,7 +140,7 @@ export const fetchProductStats = async (products: Product[]): Promise<Product[]>
       price: value.price,
       currency: value.currency,
       quantity: value.quantity,
-      category_id: value.category_id,
+      category_id: categories[value.category_id] || "",
       images: value.images,
       brand: value.brand,
       dimensions: value.dimensions || "", // Dimensions du produit (e.g., 10x15x20 cm)"
@@ -122,11 +159,10 @@ export const fetchProductStats = async (products: Product[]): Promise<Product[]>
   }
 };
 
-// Récupérer un produit par son Id
+// Récupérer un produit par son Id et ses avis
 export const fetchProductById = async (product_id: string): Promise<Product[]> => {
   try {
     const { data } = await api.get(`products/${product_id}`);
-    console.log("data = ", data);
     const data2 = await api.post("product_reviews/product_rating/", {product_ids: [product_id]});
     data.rating = data2.data.ratings[product_id]["average_rating"];
     return [data];
@@ -136,8 +172,19 @@ export const fetchProductById = async (product_id: string): Promise<Product[]> =
   }
 };
 
+// Récupérer un produit par son Id
+export const fetchProductId = async (product_id: string[] = []): Promise<Product[]> => {
+  try {
+    const { data } = await api.post(`products/product_id`, product_id=product_id);
+    return [data];
+  } catch (error) {
+    ErreurMessage(error);
+    return [];
+  }
+};
+
 // Ajouter un produit au Panier
-export const addToCarts = async (products: Product, user_id: string): Promise<Product[]> => {
+export const addToCarts = async (products: [Product], user_id: string): Promise<Product[]> => {
   try {
     const { data } = await api.post("carts/", {
       "user_id": user_id,
@@ -160,7 +207,7 @@ export const addToCarts = async (products: Product, user_id: string): Promise<Pr
 };
 
 // Ajouter un produit à la liste des souhaits
-export const addToWishLists = async (products: Product, user_id: string): Promise<Product[]> => {
+export const addToWishLists = async (products: [Product], user_id: string): Promise<Product[]> => {
   try {
     const { data } = await api.post("wishlists/", {
       "user_id": user_id,
@@ -204,9 +251,20 @@ export const DeleteProduct = async (product_id: string) => {
 };
 
 // Fonction pour compter tous les produits
-export const ProductCount = async () => {
+export const ProductCount = async (seller_id: string = "") => {
   try {
-    const { data } = await api.get(`products/count/`);
+    const { data } = seller_id === "" ? await api.get(`products/count/`) : await api.get(`products/count/?user_id=${seller_id}`);
+    return data;
+  } catch (error) {
+    ErreurMessage(error);
+    return [];
+  }
+};
+
+// Ajouter un produit 
+export const addProduct = async (product_data: Product): Promise<Product[]> => {
+  try {
+    const { data } = await api.post(`/products/`, product_data);
     return data;
   } catch (error) {
     ErreurMessage(error);

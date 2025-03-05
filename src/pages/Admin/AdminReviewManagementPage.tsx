@@ -1,64 +1,40 @@
 import React, { useState, useEffect } from "react";
 import Button from "../../components/Button.tsx";
-import Tooltip from "../../components/TooltipProps.tsx";
-
-interface Review {
-  id: number;
-  userName: string;
-  productName: string;
-  rating: number;
-  comment: string;
-  date: string;
-  status: "Approuvé" | "En attente";
-}
+import Loader from "../../components/Loader.tsx";
+import { fetchAllReviews, UpdateReview, DeleteReview } from "../../services/ReviewService.ts";
+import { Review } from "../../entities/Reviews.tsx";
+import { updateData } from "../../utils/UpdateFunction.ts";
 
 const AdminReviewManagementPage: React.FC = () => {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [filter, setFilter] = useState({ rating: 0, user: "", product: "" });
-  const [sortField, setSortField] = useState<"rating" | "date" | "productName">("date");
+  const [sortField, setSortField] = useState<"rating" | "date" | "product_name">("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Simulation de récupération des avis
     const fetchReviews = async () => {
-      const mockReviews: Review[] = [
-        {
-          id: 1,
-          userName: "Alice Dupont",
-          productName: "Smartphone XYZ",
-          rating: 5,
-          comment: "Excellent produit, je recommande !",
-          date: "2025-01-10",
-          status: "Approuvé",
-        },
-        {
-          id: 2,
-          userName: "Jean Martin",
-          productName: "Casque Bluetooth ABC",
-          rating: 3,
-          comment: "Correct, mais peut mieux faire.",
-          date: "2025-01-09",
-          status: "En attente",
-        },
-        {
-          id: 3,
-          userName: "Marie Curie",
-          productName: "Tablette DEF",
-          rating: 4,
-          comment: "Très satisfait de mon achat.",
-          date: "2025-01-08",
-          status: "Approuvé",
-        },
-      ];
-      setReviews(mockReviews);
+      try {
+        setLoading(true);
+        setMessage(null);
+        const mockReviews: Review[] = await fetchAllReviews();
+        setReviews(mockReviews);
+        setLoading(false);
+        setMessage(null);
+      } catch (error: any) {
+        setMessage("Erreur de chargement des avis.");
+        // toast.error(error.message || "Une erreur est survenue.");
+      } finally {
+        setLoading(false);
+      }
     };
-
     fetchReviews();
   }, []);
 
   // Trier les avis
-  const sortedReviews = [...reviews].sort((a, b) => {
+  const sortedReviews = [...reviews].sort((a: any, b: any) => {
     const valueA = a[sortField];
     const valueB = b[sortField];
 
@@ -70,35 +46,63 @@ const AdminReviewManagementPage: React.FC = () => {
   const filteredReviews = sortedReviews.filter(
     (review) =>
       (filter.rating === 0 || review.rating === filter.rating) &&
-      (filter.user === "" || review.userName.toLowerCase().includes(filter.user.toLowerCase())) &&
-      (filter.product === "" || review.productName.toLowerCase().includes(filter.product.toLowerCase()))
+      (filter.user === "" || review.user_id.toLowerCase().includes(filter.user.toLowerCase())) &&
+      (filter.product === "" || review.product_name.toLowerCase().includes(filter.product.toLowerCase()))
   );
 
   // Gérer les actions
-  const handleApprove = (id: number) => {
-    setReviews((prevReviews) =>
-      prevReviews.map((review) =>
-        review.id === id ? { ...review, status: "Approuvé" } : review
-      )
-    );
-    setMessage("Avis approuvé avec succès.");
+  const handleApprove = async (review_id: string) => {
+    try {
+      const updateReview = updateData(review_id, reviews, ["statut"], [true]);
+      if (updateReview === null) {
+        setMessage("Cet avis n'existe pas.");
+      } else {
+        const response = await UpdateReview(review_id, updateReview);
+
+        if (response) {
+          setReviews((prevReviews) =>
+            prevReviews.map((review) =>
+              review.id === review_id ? updateReview : review
+            )
+          );
+          setMessage("Avis approuvé avec succès.");
+        } else {
+          setMessage("Erreur lors de la validation du produit.");
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      setMessage("Erreur de connexion au serveur.");
+    }
   };
 
-  const handleDelete = (id: number) => {
-    setReviews((prevReviews) => prevReviews.filter((review) => review.id !== id));
-    setMessage("Avis supprimé avec succès.");
+  const handleDelete = async (review_id: string) => {
+    try {
+      const response = await DeleteReview(review_id);
+
+      if (response) {
+        setReviews((prevReviews) => prevReviews.filter((review) => review.id !== review_id));
+        setMessage("Avis supprimé avec succès.");
+      } else {
+        setMessage("Erreur lors de la suppression de l'avis.");
+      }
+      
+    } catch (error) {
+      console.error(error);
+      setMessage("Erreur de connexion au serveur.");
+    }
   };
 
   const exportData = () => {
     const csvContent = [
       ["Utilisateur", "Produit", "Note", "Commentaire", "Date", "Statut"],
       ...filteredReviews.map((review) => [
-        review.userName,
-        review.productName,
+        review.user_id,
+        review.product_name,
         review.rating,
         review.comment,
-        review.date,
-        review.status,
+        review.created_at.split("T")[0],
+        review.statut ? "Approuvé" : "En attente",
       ]),
     ]
       .map((row) => row.join(","))
@@ -118,6 +122,8 @@ const AdminReviewManagementPage: React.FC = () => {
   const totalReviews = reviews.length;
   const averageRating =
     reviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews || 0;
+
+  if (loading) return <Loader />;
 
   return (
     <div className="p-6 max-w-7xl mx-auto bg-white shadow-md rounded-md">
@@ -198,24 +204,24 @@ const AdminReviewManagementPage: React.FC = () => {
             {filteredReviews.length > 0 ? (
               filteredReviews.map((review) => (
                 <tr key={review.id}>
-                  <td className="border p-2">{review.userName}</td>
-                  <td className="border p-2">{review.productName}</td>
+                  <td className="border p-2">{review.user_id}</td>
+                  <td className="border p-2">{review.product_name}</td>
                   <td className="border p-2">{`${review.rating} ⭐`}</td>
                   <td className="border p-2">{review.comment}</td>
-                  <td className="border p-2">{review.date}</td>
+                  <td className="border p-2">{review.created_at.split("T")[0]}</td>
                   <td className="border p-2">
                     <span
                       className={`px-3 py-1 rounded-full text-sm ${
-                        review.status === "Approuvé"
+                        (review.statut ? "Approuvé" : "En attente") === "Approuvé"
                           ? "bg-green-200 text-green-800"
                           : "bg-yellow-200 text-yellow-800"
                       }`}
                     >
-                      {review.status}
+                      {(review.statut ? "Approuvé" : "En attente")}
                     </span>
                   </td>
                   <td className="border p-2 flex gap-2">
-                    {review.status === "En attente" && (
+                    {(review.statut ? "Approuvé" : "En attente") === "En attente" && (
                       <Button
                         label="Approuver"
                         onClick={() => handleApprove(review.id)}

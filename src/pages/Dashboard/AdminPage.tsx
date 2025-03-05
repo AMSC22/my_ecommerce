@@ -2,11 +2,13 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Button from "../../components/Button.tsx";
 import Card from "../../components/Card.tsx";
+import Loader from "../../components/Loader.tsx";
 import BarChart from "../../components/BarChart.tsx";
 import LineChart from "../../components/LineChart.tsx";
 import { CategoryCount } from "../../services/CategoryService.ts";
 import { ProductCount } from "../../services/ProductService.ts";
 import { ReviewCount } from "../../services/ReviewService.ts";
+import { UserCount } from "../../services/UserService.ts";
 
 const AdminDashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -21,7 +23,8 @@ const AdminDashboardPage: React.FC = () => {
   });
   const [products, setProducts] = useState<number>(0);
   const [categorys, setCategory] = useState<number>(0);
-  const [review, setReview] = useState<number>(0);
+  const [review, setReview] = useState<{"total_reviews": number, "average_ratings": number}>({"total_reviews": 0, "average_ratings": 0});
+  const [user, setUser] = useState<{"buyer": number, "seller": number}>({"buyer": 0, "seller": 0});
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [monthlySalesData, setMonthlySalesData] = useState<number[]>([]);
@@ -41,6 +44,9 @@ const AdminDashboardPage: React.FC = () => {
           setCategory(Categorys);
           const review = await ReviewCount();
           setReview(review);
+          const users = await UserCount();
+          console.log("users = ", users);
+          setUser(users);
           setLoading(false);
           setMessage(null);
         } catch (error: any) {
@@ -84,6 +90,8 @@ const AdminDashboardPage: React.FC = () => {
     // Appel d'API à implémenter pour appliquer les filtres
   };
 
+  if (loading) return <Loader />;
+
   return (
     <div className="p-6 max-w-7xl mx-auto bg-white shadow-md rounded-md">
       {/* En-tête */}
@@ -92,6 +100,7 @@ const AdminDashboardPage: React.FC = () => {
         <p className="text-gray-600">
           Surveillez les activités de la plateforme et prenez des décisions éclairées.
         </p>
+        {message && <p className="mb-4 text-green-500">{message}</p>}
       </header>
 
       {/* Notifications */}
@@ -146,20 +155,20 @@ const AdminDashboardPage: React.FC = () => {
         />
         <Card
           title="Utilisateurs totaux"
-          description={`${dashboardData.totalUsers}`}
+          description={`${user.seller + user.buyer}`}
           link="/admin-user-management"
           className="bg-blue-100 text-blue-700"
         />
         <Card
           title="Vendeurs"
-          description={`${dashboardData.totalSellers}`}
-          link="/admin-user-management?sellers=true"
+          description={`${user.seller}`}
+          // link="/admin-user-management?sellers=true"
           className="bg-green-100 text-green-700"
         />
         <Card
           title="Acheteurs"
-          description={`${dashboardData.totalBuyers}`}
-          link="/admin-user-management?buyers=true"
+          description={`${user.buyer}`}
+          // link="/admin-user-management?buyers=true"
           className="bg-purple-100 text-purple-700"
         />
         <Card
@@ -181,7 +190,7 @@ const AdminDashboardPage: React.FC = () => {
         />
         <Card
           title="Avis totaux"
-          description={`${review}`}
+          description={`${review.total_reviews}`}
           link="/admin-review-management"
           className="bg-gray-200 text-gray-800"
         />
@@ -228,11 +237,6 @@ const AdminDashboardPage: React.FC = () => {
           <Button
             label="Valider les catégories"
             onClick={() => navigate("/admin-validation-category")}
-            className="bg-green-500 text-white px-4 py-2 rounded"
-          />
-          <Button
-            label="Valider les produits"
-            onClick={() => navigate("/admin-validation-product")}
             className="bg-green-500 text-white px-4 py-2 rounded"
           />
           <Button

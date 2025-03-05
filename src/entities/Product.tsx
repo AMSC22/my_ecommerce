@@ -18,4 +18,9 @@ export interface Product
       status: string, // Statut du produit (e.g., available, out_of_stock)
       rating: number, // Evalution ou nombre d'étoile
       created_at: string,
+      performance?: {
+        sales: any,
+        views: any,
+        rating: any,
+      }
     }
